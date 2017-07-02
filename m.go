@@ -87,8 +87,9 @@ type mcomplex128 struct {
 	errs []error
 }
 type mtype struct {
-	v    reflect.Value
-	errs []error
+	v     reflect.Value
+	errs  []error
+	funcs []reflect.Value
 }
 
 func Bool(b bool, err ...error) mbool                   { return mbool{b, err} }
@@ -110,7 +111,7 @@ func Float32(f float32, err ...error) mfloat32          { return mfloat32{f, err
 func Float64(f float64, err ...error) mfloat64          { return mfloat64{f, err} }
 func Complex64(c complex64, err ...error) mcomplex64    { return mcomplex64{c, err} }
 func Complex128(c complex128, err ...error) mcomplex128 { return mcomplex128{c, err} }
-func Type(v interface{}, err ...error) mtype            { return mtype{reflect.ValueOf(v), err} }
+func Type(v interface{}, err ...error) mtype            { return mtype{v: reflect.ValueOf(v), errs: err} }
 
 func (m mbool) Get() bool {
 	panics(m.errs)
@@ -189,8 +190,23 @@ func (m mcomplex128) Get() complex128 {
 	return m.c
 }
 func (m mtype) Get(v interface{}) {
+	val := m.v
+	rtn := reflect.ValueOf(v)
+	if len(m.funcs) == 0 {
+		reflect.Indirect(rtn).Set(val)
+		return
+	}
+	for _, fn := range m.funcs {
+		m.errs = append(
+			m.errs,
+			fn.Call([]reflect.Value{
+				val,
+				rtn,
+			})[0].Interface().(error),
+		)
+		val = rtn
+	}
 	panics(m.errs)
-	reflect.Indirect(reflect.ValueOf(v)).Set(m.v)
 }
 
 func (m mbool) Set(fn func(bool) bool) mbool {
@@ -252,9 +268,9 @@ func (m mcomplex128) Set(fn func(complex128) complex128) mcomplex128 {
 }
 func (m mtype) Set(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{m.v})[0],
+		m.v,
 		m.errs,
+		append(m.funcs, reflect.ValueOf(fn)),
 	}
 }
 
@@ -314,9 +330,9 @@ func (m mbool) ToComplex128(fn func(bool) complex128) mcomplex128 {
 }
 func (m mbool) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.b)})[0],
+		reflect.ValueOf(m.b),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -376,9 +392,9 @@ func (m mstring) ToComplex128(fn func(string) complex128) mcomplex128 {
 }
 func (m mstring) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.s)})[0],
+		reflect.ValueOf(m.s),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -438,9 +454,9 @@ func (m mint) ToComplex128(fn func(int) complex128) mcomplex128 {
 }
 func (m mint) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.i)})[0],
+		reflect.ValueOf(m.i),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -500,9 +516,9 @@ func (m mint8) ToComplex128(fn func(int8) complex128) mcomplex128 {
 }
 func (m mint8) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.i)})[0],
+		reflect.ValueOf(m.i),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -562,9 +578,9 @@ func (m mint16) ToComplex128(fn func(int16) complex128) mcomplex128 {
 }
 func (m mint16) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.i)})[0],
+		reflect.ValueOf(m.i),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -624,9 +640,9 @@ func (m mint32) ToComplex128(fn func(int32) complex128) mcomplex128 {
 }
 func (m mint32) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.i)})[0],
+		reflect.ValueOf(m.i),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -686,9 +702,9 @@ func (m mint64) ToComplex128(fn func(int64) complex128) mcomplex128 {
 }
 func (m mint64) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.i)})[0],
+		reflect.ValueOf(m.i),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -748,9 +764,9 @@ func (m muint) ToComplex128(fn func(uint) complex128) mcomplex128 {
 }
 func (m muint) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.u)})[0],
+		reflect.ValueOf(m.u),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -810,9 +826,9 @@ func (m muint8) ToComplex128(fn func(uint8) complex128) mcomplex128 {
 }
 func (m muint8) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.u)})[0],
+		reflect.ValueOf(m.u),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -872,9 +888,9 @@ func (m muint16) ToComplex128(fn func(uint16) complex128) mcomplex128 {
 }
 func (m muint16) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.u)})[0],
+		reflect.ValueOf(m.u),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -934,9 +950,9 @@ func (m muint32) ToComplex128(fn func(uint32) complex128) mcomplex128 {
 }
 func (m muint32) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.u)})[0],
+		reflect.ValueOf(m.u),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -996,9 +1012,9 @@ func (m muint64) ToComplex128(fn func(uint64) complex128) mcomplex128 {
 }
 func (m muint64) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.u)})[0],
+		reflect.ValueOf(m.u),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1058,9 +1074,9 @@ func (m muintptr) ToComplex128(fn func(uintptr) complex128) mcomplex128 {
 }
 func (m muintptr) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.u)})[0],
+		reflect.ValueOf(m.u),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1120,9 +1136,9 @@ func (m mbyte) ToComplex128(fn func(byte) complex128) mcomplex128 {
 }
 func (m mbyte) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.b)})[0],
+		reflect.ValueOf(m.b),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1182,9 +1198,9 @@ func (m mrune) ToComplex128(fn func(rune) complex128) mcomplex128 {
 }
 func (m mrune) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.r)})[0],
+		reflect.ValueOf(m.r),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1244,9 +1260,9 @@ func (m mfloat32) ToComplex128(fn func(float32) complex128) mcomplex128 {
 }
 func (m mfloat32) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.f)})[0],
+		reflect.ValueOf(m.f),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1306,9 +1322,9 @@ func (m mfloat64) ToComplex128(fn func(float64) complex128) mcomplex128 {
 }
 func (m mfloat64) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.f)})[0],
+		reflect.ValueOf(m.f),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1368,9 +1384,9 @@ func (m mcomplex64) ToComplex128(fn func(complex64) complex128) mcomplex128 {
 }
 func (m mcomplex64) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.c)})[0],
+		reflect.ValueOf(m.c),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
@@ -1430,9 +1446,9 @@ func (m mcomplex128) ToComplex64(fn func(complex128) complex64) mcomplex64 {
 }
 func (m mcomplex128) ToType(fn interface{}) mtype {
 	return mtype{
-		reflect.ValueOf(fn).
-			Call([]reflect.Value{reflect.ValueOf(m.c)})[0],
+		reflect.ValueOf(m.c),
 		m.errs,
+		[]reflect.Value{reflect.ValueOf(fn)},
 	}
 }
 
